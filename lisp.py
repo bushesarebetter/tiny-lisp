@@ -256,7 +256,56 @@ def run(src, env):
     return result
 
 
+def repl(env):
+    buf = ''
+    while True:
+        try:
+            line = input('... ' if buf else 'lisp> ')
+        except EOFError:
+            print()
+            return
+        except KeyboardInterrupt:
+            print()
+            buf = ''
+            continue
+        buf += line + '\n'
+        try:
+            exprs = read_all(buf)
+        except Incomplete:
+            continue
+        except LispError as e:
+            print(f'error: {e}')
+            buf = ''
+            continue
+        buf = ''
+        for x in exprs:
+            try:
+                val = evaluate(x, env)
+            except RecursionError:
+                print('error: recursion too deep (only tail calls are unbounded)')
+                break
+            except Exception as e:
+                print(f'error: {e}')
+                break
+            if val is not None:
+                print(to_str(val))
 
 
+def main():
+    sys.setrecursionlimit(20000)  # non-tail recursion still uses the Python stack
+    env = standard_env()
+    if len(sys.argv) < 2:
+        repl(env)
+        return
+    with open(sys.argv[1]) as f:
+        src = f.read()
+    try:
+        run(src, env)
+    except RecursionError:
+        sys.exit('error: recursion too deep (only tail calls are unbounded)')
+    except Exception as e:
+        sys.exit(f'error: {e}')
 
 
+if __name__ == '__main__':
+    main()
